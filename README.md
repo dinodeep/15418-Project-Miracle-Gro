@@ -12,7 +12,7 @@ We are going to implement a version of the Random Forest Machine Learning Model 
 # Background
 The application that we are going to parallelize is the Random Forest machine learning algorithm. This algorithm is an ensemble-based supervised machine learning algorithm that trains multiple independent decision tree models on a bootstrapped subsets of the original training dataset from machine learning. During prediction, the predicted samples are passed through each of the trees, and then, their results are combined to get an expected output for the input. The high-level algorithm for generating the random forest classifier can be found below.
 
-![Random Forest Algorithm](rf_algo.png) 
+![Random Forest Algorithm](rf-algo.png) 
 
 Source: [University of Wisconsin-Madison](https://pages.cs.wisc.edu/~matthewb/pages/notes/pdf/ensembles/RandomForests.pdf)
 
