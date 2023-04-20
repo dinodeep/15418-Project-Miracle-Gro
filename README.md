@@ -1,9 +1,6 @@
 # 15418-Project-Miracle-Gro
 Miracle-Gro Project for Fast Parallel Training and Inference of Random Forest Models
 
-# Milestone Report
-<embed src="15418-project-milestone-report.pdf" type="application/pdf">
-
 # URL
 [Miracle-Gro Project Page](https://dinodeep.github.io/15418-Project-Miracle-Gro/)
 
@@ -58,9 +55,17 @@ Our platform for developing our algorithm is the Bridges-2 machines and the Gate
 
 # Schedule
 
-- [done] Week of 4/2-4/8: Start on implementation of Random Forest in C++. Reference source code from \texttt{sklearn}. 
-- [done] Week of 4/9-4/15: Finish writing implementation of Random Forest. Start on profiling of the sequential implementation. Perform experiments to show what parts of the code are the slowest and where there is the most room for improvement with parallelism. 
-- [in progress] By Midway 4/19: Finish sequential implementation and profiling. 
-- Week of 4/16-4/22: Start optimizing sequential implementation using OpenMP. 
-- Week of 4/23-4/29: Perform further experiments to compare the new parallel implementation to the original sequential implementation. 
-- Week of 4/30-5/4: Put together final deliverables and prepare for final demo. 
+- [DONE]: Week of 4/2-4/8: Start on implementation of Random Forest in C++. Reference source code from \texttt{sklearn}. 
+- [DONE]: Week of 4/9-4/15: Finish writing implementation of Random Forest. Start on profiling of the sequential implementation. Perform experiments to show what parts of the code are the slowest and where there is the most room for improvement with parallelism. 
+- [In Progress]: By Midway 4/19: Finish sequential implementation and profiling. (Deep)
+  - [Done]: By 4/17: finish writing the sequential implementation and finding dataset for performing profiling (Deep)
+  - [In Progress]: By 4/19: complete profiling of the sequential profiling and determine the slow portions of training the random forest model and define specific conditions for experimentation with parallelized version.
+- [Not Started]: Week of 4/16-4/22: Start optimizing sequential implementation using OpenMP. (Meher)
+  - [In Progress]: By 4/20: complete an initial parallelization of the random forest training process by training trees in parallel
+  - [Not Started]: By 4/22: improve the parallelization by performing fine-grained parallelized training by parallelizing a finer task in the training process that is expensive (determined by profiling the sequential implementation) and by parallelizing the prediction of the random forest.
+- [Not Started]:  Week of 4/23-4/29: Perform further experiments to compare the new parallel implementation to the original sequential implementation. (Deep)
+  - Not Started: By 4/26: Complete experiments comparing the speedups of training the random forest model's sequential implementation versus the parallel implementation on various dataset, and then, compare the results using different parallelized components.
+  - Not Started: By 4/29: Accumulate the results into a writeup and compare the results by running the experiments with a higher core count on the PSC machines.
+- [Not Started] Week of 4/30-5/4: Put together final deliverables and prepare for final demo. (Meher)
+  - Not Started: Begin generating plots describing the speedup of the parallel version over the sequential version for both training and prediction of the random forest model using various datasets. Furthermore, find demo that can be run during the poster session that describes the performance improvements and trade-offs considered in training the parallel random forest in comparison to the sequential one.
+  - Not Started: Produce final poster and confirm the demo that will be run during the poster session.
