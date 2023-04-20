@@ -55,9 +55,9 @@ Our platform for developing our algorithm is the Bridges-2 machines and the Gate
 
 # Schedule
 
-- [x] Week of 4/2-4/8: Start on implementation of Random Forest in C++. Reference source code from \texttt{sklearn}. 
-- [x] Week of 4/9-4/15: Finish writing implementation of Random Forest. Start on profiling of the sequential implementation. Perform experiments to show what parts of the code are the slowest and where there is the most room for improvement with parallelism. 
-- [ ] By Midway 4/19: Finish sequential implementation and profiling. 
-- [ ] Week of 4/16-4/22: Start optimizing sequential implementation using OpenMP. 
-- [ ] Week of 4/23-4/29: Perform further experiments to compare the new parallel implementation to the original sequential implementation. 
-- [ ] Week of 4/30-5/4: Put together final deliverables and prepare for final demo. 
+- [done] Week of 4/2-4/8: Start on implementation of Random Forest in C++. Reference source code from \texttt{sklearn}. 
+- [done] Week of 4/9-4/15: Finish writing implementation of Random Forest. Start on profiling of the sequential implementation. Perform experiments to show what parts of the code are the slowest and where there is the most room for improvement with parallelism. 
+- [in progress] By Midway 4/19: Finish sequential implementation and profiling. 
+- Week of 4/16-4/22: Start optimizing sequential implementation using OpenMP. 
+- Week of 4/23-4/29: Perform further experiments to compare the new parallel implementation to the original sequential implementation. 
+- Week of 4/30-5/4: Put together final deliverables and prepare for final demo. 
