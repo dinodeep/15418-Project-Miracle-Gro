@@ -1,6 +1,9 @@
 # 15418-Project-Miracle-Gro
 Miracle-Gro Project for Fast Parallel Training and Inference of Random Forest Models
 
+# Final Report
+<a href="15418-project-final-report.pdf">Final Report PDF</a>
+
 # Milestone Report
 <a href="15418-project-milestone-report.pdf">Milestone Report PDF</a>
 
