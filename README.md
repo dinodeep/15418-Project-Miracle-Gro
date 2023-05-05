@@ -41,60 +41,66 @@ Furthermore, we have allowed for additional hyperparameters in training on rando
 
 Source: [University of Wisconsin-Madison](https://pages.cs.wisc.edu/~matthewb/pages/notes/pdf/ensembles/RandomForests.pdf)
 
-![Find Best Feature to Split on for a Given Node](psuedo-best-split.png) 
+![Find Best Feature to Split on for a Given Node](psuedo_best_split.png) 
 
 There are a number of avenues of improvement that can exploit the potential for parallelism in this code. For example, each tree in the random forest (individual decision tree) can be generated in parallel. Furthermore, within each tree, the various branches of the decision tree can be generated in parallel as well because they are independent regions of code. Additionally, when we are calculating the best split for a given node, that requires iterating over all possible features in our data and considering some set of splits for that feature. Then, we compute the gini-impurity score over all possible splits. Thus, to find the best split, calculating the gini-impurity score for all possible splits is independent of each other. As a result, the algorithm for training the random forest model has model parallelism that can be exploited to a high degree. When providing a prediction, the result is dependent on the predictions from each of the individual decision trees and therefore there are dependencies in the `predict` part of the algorithm. One important aspect to note is that this algorithm is recursive due to the recursive training algorithm of decision trees.
 
 With respect to the various traits of synchronization and communication, the primary dependencies in the training algorithm consist of computing the best split before determining the data that is to be sent to the nodes that are deeper in the tree. However, as mentioned before, due to the independent possible splits and the independent leaf nodes, we can perform the calculation of these objects in parallel. Due to the recursive and conditional nature of training the decision trees, there is little data-parallelism, and instead, model-parallelism is more prevalent to this algorithm. As a result, this algorithm is not necessarily amenable to SIMD execution, and furthermore, there is not as much locality in this algorithm. However, the focus on using shared-memory parallelism allows to us ensure that communication is not as expensive as other parallelism methods such as SIMD and message passing parallelism.
 
-# The Challenge
+# Approach
 
-This problem can be challenging to parallelize because there is sequential dependencies when training individual decision tree models for the overall random forest classifier. Furthermore, because there are a lot of different spaces for parallelism, there is likely a balance on what sections of the code to parallelize with the limited resources that we have access to when running our code on parallel machines. 
+## Languages and Technologies Used
 
-The primary dependencies in the code are mostly related to the need to implement the prior nodes in the decision tree algorithms for later nodes in the list. Another important difficulty is that we need to determine the best splits for each node when performing the algorithm which reduces the amount of time. Furthermore, when creating a single decision tree, there is significant computation required to determine the best split for the tree.
+This project was written completely in C++. We converted the original Python implementation of random forest from Python into a simplified C++ version so that we could compare a sequential version to our parallel implementation that would be in C++. This removes variability between python and C++. In order to exploit parallelism, we used OpenMP, and we specifically targeted the Gates machines which have 8 cores. Additionally, to deal with using matrices and some basic linear algebra functionalities, we utilized the \texttt{Eigen} C++ library for running this algorithm.
 
-One property of the system that makes this workload challenging is that there is a lot of shared memory that is being used between different trees and various nodes within trees, and as a result, this can make it difficult to make sure that there arent' any issues with have race conditions on shared memory. As a result, we must make sure to be extra careful to avoid these kinds of issues.
+## Mapping Between Data Structures and Hardware
 
-# Resources
+As described more in-depth below, we have used multiple methods for parallelizing the implementation of the training of the random forest algorithm. Instead of having multiple decision trees (within a random forest) train on a single thread, utilizing OpenMP task-based threading, we were able to move the creation of each tree (a single task) to different threads. Thus, each tree in a forest was mapped to a single thread on the machine.
 
-We will use the gates machines to train our models. We will probably not use any type of starter code. Our plan is to first write an implementation of the random forest algorithm in C++. In order to write this implementation, we will reference implementations in Python from packages such as scikit-learn. The reference can be seen here: [sklearn Documentation](https://github.com/scikit-learn/scikit-learn/blob/9aaed4987/sklearn/ensemble/\_forest.py#L1081). 
+Furthermore, we've represented the training of a single node within a tree as an OpenMP task as well. Thus, we have that nodes are mapped to a single thread that is working to complete its computation. Finally, for the finest-level of parallelism, we are representing the computation of the gini-impurity score for a single split as a task within OpenMP as well. Thus, the work of computing that gini-impurity score is also mapped to a thread for work. Regardless, all pieces of independent work are being mapped to a single thread that will complete its execution due to the fact that we are using the OpenMP parallelism model for training.
 
-# Goals and Deliverables
+## Code Profiling
 
-## What We Plan to Achieve
-The following are the goals that we definitely want to complete during the timeline of this project as well as what we define as a successful project. 
-- Write a working implementation of the Random Forest Algorithm in C++.
-- Profile the performance of the sequential algorithm to determine where most of the time is spent in the program to determine what components of the Random Forest training and prediction algorithsm to most heavily focus on efficient parallelization.
-- Parallelize this algorithm using OpenMP and perform experiments to analyze speedup and limitations to speedup in the original implementation. 
+Given our pre-existing knowledge about the random forest algorithm, we had some idea of what areas of the sequential code had the most opportunity for parallelization. This included parallelizing the training of individual random trees within a forest, as they are all significant and independent pieces of computation. Furthermore, from our prior experience with Lab 3 using OpenMP to improve the speedup for an N-body simulation, we noticed that the tree-like structure exhibits a very similar structure to that of the quad-trees in Lab 3. Thus, we noticed that we can parallelize the creation of the children as well. Furthermore, we believed that there were other opportunities for parallelizing this algorithm to make it more efficient, specifically for the computation within a single node. In order to confirm our hypothesis as well as find other areas for improvement that we may not have thought of, we started by profiling the sequential implementation of the random forest algorithm. 
 
+In order to profile our code, we placed timing code around the main areas of the implementation. We got a total time for training a single decision tree. Within training a decision tree, in the `fit` function, the three main portions of computation were determined to be the calls to `find_best_split`, `split`, and the recursive calls for training the children. We placed individual timers around these calls to gain a more granular look at which portions of the code were slow. A sample of the outputs that were received is below.
 
-## What We Hope to Achieve
-We hope to achieve the following given that our prior portions of the project work out well and allow us the time to pursue other goals
-- Implement the parallel decision tree algorithm in other parallel programming models and potentially using hybrid programming models to improve performance such as mixing MPI across trees and OpenMP within trees to perform more efficient training and prediction.
+```
+Find Best Split takes: 0.014s
+[node=  <root>,L,L,L,L,L] time=0.0144
+        [node=  <root>,L,L,L,L,L] elapsed-find-split=0.0139
+        [node=  <root>,L,L,L,L,L] elapsed-split=0.0003
+[node=  <root>,L,L,L,L] time=0.0287
+        [node=  <root>,L,L,L,L] elapsed-find-split=0.0139
+        [node=  <root>,L,L,L,L] elapsed-split=0.0004
+[node=  <root>,L,L,L] time=0.0434
+        [node=  <root>,L,L,L] elapsed-find-split=0.0142
+        [node=  <root>,L,L,L] elapsed-split=0.0004
+[node=  <root>,L,L] time=0.0580
+        [node=  <root>,L,L] elapsed-find-split=0.0142
+        [node=  <root>,L,L] elapsed-split=0.0003
+[node=  <root>,L] time=0.0754
+        [node=  <root>,L] elapsed-find-split=0.0169
+        [node=  <root>,L] elapsed-split=0.0004
+[node=  <root>] time=0.1068
+        [node=  <root>] elapsed-find-split=0.0303
+        [node=  <root>] elapsed-split=0.0007
+Done Training Tree: 19
+Full Parallel Training Time: 2.084s
+```
 
-## Poster Session Demo
-We plan to demo our algorithm at the poster session where we will train our Random Forest algorithm on various datasets using our sequential implementation and then show the performance improvements using the our parallel version of the algorithm. We will show the comparable accuracies of the sequential and parallel algorithms which should show similar performance; however, we will show plots displaying how the parallel algorithm has strong speedup. Furthermore, we will generate plots on how speedup for training and inference time change with the number of processors for our workloads and show that our algorithms significantly improve the speedup.
+As we can see here, for each individual non-leaf node, the time to find the best split is several times larger than the time to split all the data at that node. On average, we found that actually splitting the data was not significant in training time in comparison to the rest of the code. We found that on average $25\%$ of computation was spent finding the best split, while the remaining time was mostly spent on training the children nodes, which will be computed in parallel as described below. However, we discovered a new portion of code to parallelize which was focusing additional parallelism on the `find_best_split` logic rather than the splitting logic of the code.
 
-## System Capability and Desired Performance
-While this is not exactly a systems project, we hope to see that this algorithm will train models with similar accuracy compared to those the models trained sequentially; and furthermore, we hope to reach near-linear speedup for the performance of our parallel algorithm in comparison to the sequential algorithm.
+## Parallelizing the Sequential Implementation and Iterations of Optimization
 
+Given these takeaways from profiling the sequential implementation, we worked towards parallelizing on three levels separately and then combining them: forest level, tree level, node level. Forest-level parallelism will refer to parallelizing the training of independent decision trees in the forest in parallel. Tree-level parallelism will refer to parallelizing over the creation of the left and right branch of a single decision tree in parallel. Node-level parallelism will refer to the parallelizing computation such as finding the best feature to split on at a single node. 
 
-# Platform Choice
-Our platform for developing our algorithm is the Bridges-2 machines and the Gates cluster machines. This makes sense because they allow us to perform shared memory parallelism that allows us to parallelize the random forest algorithm without having to worry about the difficulties of message-passing memory models which is much more complex for recursive algorithms like decision trees which the random forest is made up of. Furthermore, we will be using the C++ programming language to implement our models because the C++ programming language is efficient, and it allows us to write implementations in OpenMP, allowing us to take advantage of the parallel programming mdoels that we have been using in class. Furthermore, we will implement a sequential version of the random forest algorithm in C++ so that we are not unfairly comparing the performance of Python's `sklearn` implementation (which has overhead from Python) with a purely C++ based model.
+The first was training each of the decision trees in parallel rather than in sequence, forest-level parallelism. By the nature of the random forest algorithm, each of the decision trees in the forest is independent and the trees together are used to increase the accuracy of prediction. Because the training of each tree does not depend on the training of any other tree, each decision tree can be trained in parallel. We used OpenMP to achieve this optimization. We started with the most basic implementation of placing `#pragma omp parallel for` before the for loop that loops over the number of trees that are being created. We then experimented with different task schedules as well as different numbers of threads, timing each configuration to see which provided the best results. The results of these experiments will be shown later in the results section. We also implemented this parallelism using tasks rather than `parallel for` and compared these results in the later section as well. 
 
-# Schedule
+The next method of parallelization was parallelizing the training within a given decision tree, tree-level parallelism. When training a single non-leaf node in a decision tree, when training its left and right children nodes, we can notice that they are independent pieces of computation. As a result, we can perform the training for the left child node and the right child node in parallel. In order to do this, we attempted to use scheduling such as `#pragma omp parallel for` as well as task-based parallelism and compared the results of these along with the forest-based parallelism. 
 
-- [DONE]: Week of 4/2-4/8: Start on implementation of Random Forest in C++. Reference source code from \texttt{sklearn}. 
-- [DONE]: Week of 4/9-4/15: Finish writing implementation of Random Forest. Start on profiling of the sequential implementation. Perform experiments to show what parts of the code are the slowest and where there is the most room for improvement with parallelism. 
-- [In Progress]: By Midway 4/19: Finish sequential implementation and profiling. (Deep)
-  - [Done]: By 4/17: finish writing the sequential implementation and finding dataset for performing profiling (Deep)
-  - [In Progress]: By 4/19: complete profiling of the sequential profiling and determine the slow portions of training the random forest model and define specific conditions for experimentation with parallelized version.
-- [Not Started]: Week of 4/16-4/22: Start optimizing sequential implementation using OpenMP. (Meher)
-  - [In Progress]: By 4/20: complete an initial parallelization of the random forest training process by training trees in parallel
-  - [Not Started]: By 4/22: improve the parallelization by performing fine-grained parallelized training by parallelizing a finer task in the training process that is expensive (determined by profiling the sequential implementation) and by parallelizing the prediction of the random forest.
-- [Not Started]:  Week of 4/23-4/29: Perform further experiments to compare the new parallel implementation to the original sequential implementation. (Deep)
-  - Not Started: By 4/26: Complete experiments comparing the speedups of training the random forest model's sequential implementation versus the parallel implementation on various dataset, and then, compare the results using different parallelized components.
-  - Not Started: By 4/29: Accumulate the results into a writeup and compare the results by running the experiments with a higher core count on the PSC machines.
-- [Not Started] Week of 4/30-5/4: Put together final deliverables and prepare for final demo. (Meher)
-  - Not Started: Begin generating plots describing the speedup of the parallel version over the sequential version for both training and prediction of the random forest model using various datasets. Furthermore, find demo that can be run during the poster session that describes the performance improvements and trade-offs considered in training the parallel random forest in comparison to the sequential one.
-  - Not Started: Produce final poster and confirm the demo that will be run during the poster session.
+The final method of parallelization was node-level parallelism. One important note was that this algorithm was originally implemented by performing a minimum reduction over the gini-impurity scores over all possible splits. We realized that finding the best split is a computation that implicitly has a lot of potential for parallel computation. In order to exploit this parallelism, we changed the way that we implemented finding the best split (changed `find_best_split` to `find_best_split_parallel_dim` slightly from the sequential implementation. In the sequential implementation, we first looped over all the possible splitting indices, calculated all possible splits, then for each split, we found the one that minimized the gini-impurity index. To parallelize this, we calculated the potential splits for that index. We then looped over all these splits, estimated the gini score for each of those splits, and updated reduction variables to keep track of the best split. 
+
+Instead of this, we reconfigured the code to be for loops. We first find the best splitting value for each feature that we can split on in parallel. We then reduce over all these possible split indices/values to get a global best decision for that node. We keep track of a vector called `best_splits`. Each index in `best_splits`, holds the best splitting value if you split on that split index. In order to calculate these values, we used a nested for loop. The outer loop goes over all the possible split indices. We then calculate all the possible splits and loop over those to find the local best splitting value for the current feature. We then store this in `best_splits`. Outside this nested loop, we again loop to find the global best splitting index and value over all the possible features and this is returned. 
+
+Overall, this process required several iterations to develop and improve. Within each method of parallelism, we experimented with `parallel for` and task-based parallelism. We also looked at different scheduling methods for forest-level parallelism. We then experimented with many different ways of combining these levels of parallelism: just forest, forest and tree level parallelism, or forest+tree+node level parallelism (with parallel for and task-based). The results of all of these experiments are discussed in more detail in the results section. However, in the end, we used a task-based implementation of all of the methods of parallelism. Combining all of them resulted in the largest speedup which will be described below.
