@@ -211,5 +211,7 @@ After performing some additional profiling of our code, when training a random f
 We believe that our choice of machine (shared-memory model machine) is sound because it allows us to perform parallel algorithms that are recursive very easily. Furthermore, because these algorithms are conditional (we are splitting the data based on the node that it belongs to), we find that using a SIMD architecture such as a GPU would not be beneficial for the case of this algorithm as we would have a lot of divergent execution. However, that does not influence the shared-memory models, making performance for it very strong in comparison to other models.
 
 ## References
-
+    - Reference Python Code Converted to C++: [https://scikit-learn.org/stable/modules/generated/sklearn.ensemble.RandomForestClassifier.html](Scikit-Learn Random Forest Algorithm)
+    - Dataset: [https://archive.ics.uci.edu/ml/datasets/Internet+Firewall+Data](Firat University's Internet Firewall Dataset)
+    - Reference Image for Random Forest Algorithm: [https://pages.cs.wisc.edu/~matthewb/pages/notes/pdf/ensembles/RandomForests.pdf](University of Wisconsin-Madison)
 
