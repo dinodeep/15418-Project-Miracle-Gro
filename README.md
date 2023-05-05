@@ -113,7 +113,7 @@ In the sections below, we will discuss the setup and results of each of the expe
 
 The first set of experiments focused on looking at parallelization at the forest level. This means that we were parallelizing over the creation of independent decision trees in the forest. The setup for this experiment was training 10 decision trees with a maximum depth of 5.  The first method of parallelization that we looked at was using \texttt{\#pragma omp parallel for}. In this experiment, we compared total training time in seconds for the sequential implementation against several different scheduling strategies. Each configuration was run 5 times and the average training times are shown below. 
 
-![Random Forest Algorithm](parallel_schedules_over_trees.png) 
+![Schedules vs Training Time](parallel_schedules_over_trees.png) 
 
 *Average Training Time for Different OMP Task Schedules*
 
@@ -123,7 +123,8 @@ We can see from this graph that there was a significant decrease in total traini
 
 In the following few experiments, we looked at the impact of the constant `NUM_SPLITS_PER_FEATURE` on other values. The experimental setup was the same: 10 decision trees with a max depth of 5. This experiment was run given the results from the previous. Therefore, we are currently implementing forest-level parallelism for all trial runs using a guided schedule. In this experiment, we looked at the impact of the number of splits per feature on the accuracy and average training time of the random forest algorithm. The results are in the two plots below. 
 
-![Random Forest Algorithm](Accuracy vs. Number of Splits per Feature.png) 
+![Accuracy vs Num Splits](Accuracy\ vs.\ Number\ of\ Splits\ per\ Feature.png) 
+![Train Time vs Num Splits](Average Training Time vs Number of Splits per Feature.png) 
 
 *Accuracy and Training Time vs NUM_SPLITS_PER_FEATURE*
 
