@@ -10,16 +10,42 @@ Miracle-Gro Project for Fast Parallel Training and Inference of Random Forest Mo
 Raw URL: [https://dinodeep.github.io/15418-Project-Miracle-Gro/](https://dinodeep.github.io/15418-Project-Miracle-Gro/)
 
 # Summary
-We are going to implement a version of the Random Forest Machine Learning Model that is implemented in  Python's `sklearn`'s library in C++ parallelize it. We will be parallelizing it using OpenMP's task construct to create parallel work within a given decision tree within the forest and across the random forest.
+We implemented a version of the Random Forest Machine Learning Model that is implemented in  Python's `sklearn`'s library in C++ and parallelized it using the 8-core GHC machines. We parallelized the sequential algorithm using OpenMP's task construct to create parallel work both across decision trees in the forest as well as within a given decision tree.
 
 # Background
-The application that we are going to parallelize is the Random Forest machine learning algorithm. This algorithm is an ensemble-based supervised machine learning algorithm that trains multiple independent decision tree models on a bootstrapped subsets of the original training dataset from machine learning. During prediction, the predicted samples are passed through each of the trees, and then, their results are combined to get an expected output for the input. The high-level algorithm for generating the random forest classifier can be found below.
+
+The machine learning application that we have parallelized is the Random Forest machine learning algorithm. This algorithm is an ensemble-based supervised algorithm that trains multiple independent decision tree models on bootstrapped subsets of the original training dataset. The algorithm is trained on a dataset that includes dataset entries that have features as well as a label, hence supervised learning. The goal is to be able to accurately predict the label for a new data point. 
+
+This random forest classifier is effectively a list of independent binary trees that have data and decisions stored in their child nodes. The random forest data structure primarily consists of two main functions in its API which are described below
+
+- `fit(data, labels)` -> None;
+
+    data is a $N \times M$ matrix where there are $N$ samples in the dataset and there are $M$ features per sample. Furthermore, labels are $N \times 1$ matrix which is simply the label for each sample. This function modifies the data structure to allocate decision trees and train them by finding nodes of best split. Some of the computationally expensive portions of this function are finding the best split to split a non-leaf node at which requires iterating throughout the dataset multiple times for multiple different potential splits. Furthermore, there are opportunities for parallelism which will be described below.
+
+- `predict(data)` -> predictions;
+
+  data is an $N \times M$ matrix which we are trying to perform prediction with using a trained random forest classifier. The output predictions are an $N \times 1$ matrix containing the output predictions per sample. The expensive portions of predictions require iterating through the tree and finding which leaves in the tree the samples map to which is not as parallelizable because each move left or right in the tree on the path to a node is dependent on the prior decision along the path.
+
+For demonstration, we ran our random forest algorithm on [Firat University's Internet Firewall Dataset](https://archive.ics.uci.edu/ml/datasets/Internet+Firewall+Data) which contains 11 different features and 65532 samples, each classifying to one of 4 classes. The features and classes are listed below.
+
+- Features: source port, destination port, NAT source port, NAT destination port, action, bytes, bytes sent, bytes received, packets, elapsed time (sec), pkts\_sent, pkts\_received
+- Classes: allow, take action on, drop, or reset-both
+
+We've limited the dataset size from 65532 to 1024 samples in order to maintain reasonable training times using the current implementation of our algorithm. This would allow us to experiment with new parallelization methods as well in a more efficient manner.
+
+During prediction, the predicted samples are passed through each of the trees and their results are combined to get an expected output for the given input. The high-level algorithm for generating the random forest classifier can be found below. 
+
+Furthermore, we have allowed for additional hyperparameters in training on randomized tree algorithm by allowing the depth of the tree to be greater than 1 which allows us to explore more areas to parallelize throughout the algorithm. 
 
 ![Random Forest Algorithm](rf-algo.png) 
 
 Source: [University of Wisconsin-Madison](https://pages.cs.wisc.edu/~matthewb/pages/notes/pdf/ensembles/RandomForests.pdf)
 
-There are a number of avenues of improvement for exploiting parallel regions of code. For example, each tree in the random forest can be generated in parallel. Furthermore, the within each tree, the various branches of the decision tree can be generated in parallel as well as they are independent regions of code. As a result, the algorithm for training the random forest model has parallelism that can be exploited to a high degree.
+![Find Best Feature to Split on for a Given Node](psuedo-best-split.png) 
+
+There are a number of avenues of improvement that can exploit the potential for parallelism in this code. For example, each tree in the random forest (individual decision tree) can be generated in parallel. Furthermore, within each tree, the various branches of the decision tree can be generated in parallel as well because they are independent regions of code. Additionally, when we are calculating the best split for a given node, that requires iterating over all possible features in our data and considering some set of splits for that feature. Then, we compute the gini-impurity score over all possible splits. Thus, to find the best split, calculating the gini-impurity score for all possible splits is independent of each other. As a result, the algorithm for training the random forest model has model parallelism that can be exploited to a high degree. When providing a prediction, the result is dependent on the predictions from each of the individual decision trees and therefore there are dependencies in the `predict` part of the algorithm. One important aspect to note is that this algorithm is recursive due to the recursive training algorithm of decision trees.
+
+With respect to the various traits of synchronization and communication, the primary dependencies in the training algorithm consist of computing the best split before determining the data that is to be sent to the nodes that are deeper in the tree. However, as mentioned before, due to the independent possible splits and the independent leaf nodes, we can perform the calculation of these objects in parallel. Due to the recursive and conditional nature of training the decision trees, there is little data-parallelism, and instead, model-parallelism is more prevalent to this algorithm. As a result, this algorithm is not necessarily amenable to SIMD execution, and furthermore, there is not as much locality in this algorithm. However, the focus on using shared-memory parallelism allows to us ensure that communication is not as expensive as other parallelism methods such as SIMD and message passing parallelism.
 
 # The Challenge
 
